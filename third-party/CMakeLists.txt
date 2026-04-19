@@ -8,6 +8,20 @@ add_library(sha1 STATIC sha1/sha1.c)
 target_woof_settings(sha1)
 target_include_directories(sha1 INTERFACE sha1)
 
+add_library(vk-bootstrap STATIC vk-bootstrap/VkBootstrap.cpp)
+target_woof_settings(vk-bootstrap)
+target_include_directories(vk-bootstrap INTERFACE vk-bootstrap)
+target_include_directories(vk-bootstrap PUBLIC vulkan-headers)
+
+add_library(vk_mem_alloc INTERFACE)
+target_include_directories(vk_mem_alloc INTERFACE vk_mem_alloc)
+
+add_library(volk STATIC volk/volk.c)
+target_woof_settings(volk)
+target_include_directories(volk INTERFACE volk)
+target_include_directories(volk PUBLIC vulkan-headers)
+target_compile_definitions(volk INTERFACE VK_NO_PROTOTYPES)
+
 if(NOT libebur128_FOUND)
     add_subdirectory(libebur128)
     target_include_directories(ebur128 INTERFACE libebur128)

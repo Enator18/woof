@@ -16,3 +16,6 @@ CMakeSettings.json
 /.cache/
 CMakeFiles/
 src/CMakeFiles/
+
+# IDEA
+.idea/

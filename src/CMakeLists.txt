@@ -187,6 +187,8 @@ set(WOOF_SOURCES
     v_patch.c              v_patch.h
     v_trans.c              v_trans.h
     v_video.c              v_video.h
+    vk_vkb.cpp             vk_vkb.h
+    vk_vma_impl.cpp
     w_wad.c                w_wad.h
                            w_internal.h
     w_file.c
@@ -233,6 +235,9 @@ target_link_libraries(
             netlib
             md5
             sha1
+            vk-bootstrap
+            vk_mem_alloc
+            volk
             opl
             textscreen
 )

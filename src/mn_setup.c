@@ -2462,6 +2462,9 @@ static setup_menu_t gen_settings1[] = {
     {"Dynamic Resolution", S_ONOFF, CNTR_X, M_SPC, {"dynamic_resolution"},
      .action = ResetVideoHeight},
 
+    {"GPU Driven Rendering", S_ONOFF, CNTR_X, M_SPC, {"gpu_driven"},
+     .action = ResetVideo},
+
     {"Widescreen", S_CHOICE, CNTR_X, M_SPC, {"widescreen"},
      .strings_id = str_widescreen, .action = ResetVideo},
 

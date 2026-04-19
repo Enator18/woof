@@ -71,6 +71,7 @@
 fixed_t fractionaltic;
 
 boolean dynamic_resolution;
+boolean gpu_driven;
 
 int current_video_height;
 static int default_current_video_height;
@@ -1721,6 +1722,7 @@ void I_BindVideoVariables(void)
               &current_video_height, 600, 200, UL, ss_none, wad_no,
               "Vertical resolution");
     BIND_BOOL_GENERAL(dynamic_resolution, true, "Dynamic resolution");
+    BIND_BOOL_GENERAL(gpu_driven, false, "GPU driven rendering");
     BIND_BOOL(correct_aspect_ratio, true, "Aspect ratio correction");
     BIND_BOOL(fullscreen, true, "Fullscreen");
     BIND_BOOL_GENERAL(use_vsync, true,
