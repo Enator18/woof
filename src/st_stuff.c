@@ -1396,10 +1396,6 @@ static void ResetElem(sbarelem_t *elem, player_t *player)
             }
             break;
 
-        case sbe_widget:
-            elem->subtype.widget->duration_left = 0;
-            break;
-
         case sbe_string:
             {
                 sbe_string_t *string = elem->subtype.string;
@@ -2039,13 +2035,7 @@ static void DrawBackground(const char *name)
 {
     if (st_refresh_background)
     {
-        static int old_st_height;
-
-        if (old_st_height < st_height)
-        {
-            old_st_height = st_height;
-            ST_InitRes();
-        }
+        ST_InitRes();
 
         V_UseBuffer(st_backing_screen, video.width);
 
@@ -2094,9 +2084,9 @@ static void DrawCenteredMessage(void)
     }
 }
 
-static void DrawStatusBar(void)
+void ST_SetSTHeight(void)
 {
-    if (!statusbar->fullscreenrender)
+    if (statusbar && !statusbar->fullscreenrender)
     {
         st_height = CLAMP(statusbar->height, 0, SCREENHEIGHT) & ~1;
     }
@@ -2104,6 +2094,11 @@ static void DrawStatusBar(void)
     {
         st_height = 0;
     }
+}
+
+static void DrawStatusBar(void)
+{
+    ST_SetSTHeight();
 
     if (st_height && (screenblocks <= 10 || automap_on))
     {
@@ -2196,7 +2191,7 @@ static void DoPaletteStuff(player_t *player)
             // tune down a bit so the menu remains legible
             if (menuactive || paused || STRICTMODE(palette_changes == PAL_CHANGE_REDUCED))
             {
-                palette /= 2;
+                palette = (palette + 1) / 2;
             }
             palette += STARTREDPALS;
         }
@@ -2210,7 +2205,7 @@ static void DoPaletteStuff(player_t *player)
         }
         if (STRICTMODE(palette_changes == PAL_CHANGE_REDUCED))
         {
-            palette /= 2;
+            palette = (palette + 1) / 2;
         }
         palette += STARTBONUSPALS;
     }
@@ -2326,10 +2321,14 @@ void ST_Init(void)
 
 void ST_InitRes(void)
 {
-    if (!st_height)
+    static int old_st_size;
+    const int st_size = video.width * V_ScaleY(st_height);
+
+    if (old_st_size >= st_size)
     {
         return;
     }
+    old_st_size = st_size;
 
     if (st_backing_screen)
     {
@@ -2337,7 +2336,7 @@ void ST_InitRes(void)
     }
     // killough 11/98: allocate enough for hires
     st_backing_screen =
-        Z_Malloc(video.width * V_ScaleY(st_height) * sizeof(*st_backing_screen),
+        Z_Malloc(st_size * sizeof(*st_backing_screen),
                  PU_STATIC, 0);
 }
 
