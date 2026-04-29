@@ -57,6 +57,8 @@
 #include "st_stuff.h"
 #include "v_patch.h"
 #include "v_video.h"
+#include "vk_init.h"
+#include "vk_main.h"
 #include "w_wad.h"
 #include "z_zone.h"
 
@@ -484,7 +486,14 @@ static void UpdateLimiter(void)
 
 void I_ToggleVsync(void)
 {
-    SDL_SetRenderVSync(renderer, use_vsync);
+    if (gpu_driven)
+    {
+        // TODO: Vulkan - toggle vsync
+    }
+    else
+    {
+        SDL_SetRenderVSync(renderer, use_vsync);
+    }
     UpdateLimiter();
 }
 
@@ -588,18 +597,26 @@ static void UpdateMouseMenu(void)
     float x, y;
     SDL_GetMouseState(&x, &y);
 
-    SDL_FRect rect;
-    SDL_GetRenderLogicalPresentationRect(renderer, &rect);
-
-    static SDL_FRect old_rect;
-    if (SDL_RectsEqualFloat(&rect, &old_rect))
+    if (gpu_driven)
     {
+        // TODO: Vulkan - check if screen resized
         ev.data1.i = 0;
     }
     else
     {
-        old_rect = rect;
-        ev.data1.i = EV_RESIZE_VIEWPORT;
+        SDL_FRect rect;
+        SDL_GetRenderLogicalPresentationRect(renderer, &rect);
+
+        static SDL_FRect old_rect;
+        if (SDL_RectsEqualFloat(&rect, &old_rect))
+        {
+            ev.data1.i = 0;
+        }
+        else
+        {
+            old_rect = rect;
+            ev.data1.i = EV_RESIZE_VIEWPORT;
+        }
     }
 
     x = clampf((x - rect.x) / rect.w, 0.0f, 1.0f) * video.unscaledw;
@@ -679,26 +696,33 @@ void I_StartFrame(void)
 
 static void UpdateRender(void)
 {
-    // When using SDL_LockTexture, the pixels made available for editing may not
-    // contain the original texture data. We have to maintain a copy of the
-    // video buffer in order to emulate HOM effects.
-    void *pixels;
-    int dst_pitch;
-    SDL_LockTexture(texture, &rect, &pixels, &dst_pitch);
-    int h = rect.h;
-    int src_pitch = video.width;
-    pixel_t *dst = pixels;
-    pixel_t *src = I_VideoBuffer;
-    while (h--)
+    if (gpu_driven)
     {
-        memcpy(dst, src, src_pitch);
-        dst += dst_pitch;        
-        src += src_pitch;
+        // TODO: Vulkan - UpdateRender
     }
-    SDL_UnlockTexture(texture);
+    else
+    {
+        // When using SDL_LockTexture, the pixels made available for editing may not
+        // contain the original texture data. We have to maintain a copy of the
+        // video buffer in order to emulate HOM effects.
+        void *pixels;
+        int dst_pitch;
+        SDL_LockTexture(texture, &rect, &pixels, &dst_pitch);
+        int h = rect.h;
+        int src_pitch = video.width;
+        pixel_t *dst = pixels;
+        pixel_t *src = I_VideoBuffer;
+        while (h--)
+        {
+            memcpy(dst, src, src_pitch);
+            dst += dst_pitch;
+            src += src_pitch;
+        }
+        SDL_UnlockTexture(texture);
 
-    SDL_RenderClear(renderer);
-    SDL_RenderTexture(renderer, texture, &frect, NULL);
+        SDL_RenderClear(renderer);
+        SDL_RenderTexture(renderer, texture, &frect, NULL);
+    }
 }
 
 static uint64_t frametime_start, frametime_withoutpresent;
@@ -882,7 +906,14 @@ void I_FinishUpdate(void)
         frametime_withoutpresent = I_GetTimeUS() - frametime_start;
     }
 
-    SDL_RenderPresent(renderer);
+    if (gpu_driven)
+    {
+        // TODO: Vulkan - present frame
+    }
+    else
+    {
+        SDL_RenderPresent(renderer);
+    }
 
     I_RestoreDiskBackground();
 
@@ -1020,6 +1051,10 @@ int gamma2;
 
 void I_SetPalette(byte *playpal)
 {
+    if (gpu_driven)
+    {
+        return;
+    }
     // haleyjd
     int i;
     const byte *const gamma = gammatable[gamma2];
@@ -1087,6 +1122,12 @@ byte I_GetNearestColor(byte *palette, int r, int g, int b)
 boolean I_WritePNGfile(char *filename)
 {
     UpdateRender();
+
+    // TODO: Vulkan - take screenshot
+    if (gpu_driven)
+    {
+        return false;
+    }
 
     SDL_Surface *surface = SDL_RenderReadPixels(renderer, NULL);
     if (surface == NULL)
@@ -1259,10 +1300,14 @@ static void ResetLogicalSize(void)
     rect.h = video.height;
     SDL_RectToFRect(&rect, &frect);
 
-    if (!SDL_SetRenderLogicalPresentation(renderer, video.width, actualheight,
-        SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    // TODO: Vulkan - idk if vulkan needs to do anything here
+    if (!gpu_driven)
     {
-        I_Printf(VB_ERROR, "Failed to set logical size: %s", SDL_GetError());
+        if (!SDL_SetRenderLogicalPresentation(renderer, video.width, actualheight,
+        SDL_LOGICAL_PRESENTATION_LETTERBOX))
+        {
+            I_Printf(VB_ERROR, "Failed to set logical size: %s", SDL_GetError());
+        }
     }
 }
 
@@ -1510,38 +1555,46 @@ static void I_InitGraphicsMode(void)
     // [FG] create rendering window
 
     char *title = M_StringJoin(gamedescription, " - ", PROJECT_STRING);
-    if (!SDL_CreateWindowAndRenderer(title, window_width, window_height, flags,
-                                     &screen, &renderer))
+    screen = SDL_CreateWindow(title, window_width, window_height, flags);
+    if (!screen)
     {
         I_Error("Error creating window for video startup: %s", SDL_GetError());
     }
     free(title);
 
+    if (gpu_driven)
+    {
+        VK_Init(W_CacheLumpName("PLAYPAL", PU_CACHE));
+        VK_InitSwapchain(window_width, window_height, use_vsync);
+    }
+    else
+    {
+        renderer = SDL_CreateRenderer(screen, NULL);
+        if (use_vsync && !timingdemo)
+        {
+            SDL_SetRenderVSync(renderer, 1);
+        }
+
+        palette = SDL_CreatePalette(256);
+        I_SetPalette(W_CacheLumpName("PLAYPAL", PU_CACHE));
+
+        // Blank out the full screen area in case there is any junk in
+        // the borders that won't otherwise be overwritten.
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
+
+        I_Printf(VB_DEBUG, "SDL %d.%d.%d (%s) render driver: %s (%s)",
+                 SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION,
+                 SDL_GetPlatform(),
+                 SDL_GetRendererName(renderer),
+                 SDL_GetCurrentVideoDriver());
+    }
+
     SetWindowPosition();
 
     I_InitWindowIcon();
-
-    if (use_vsync && !timingdemo)
-    {
-        SDL_SetRenderVSync(renderer, 1);
-    }
-
-    palette = SDL_CreatePalette(256);
-
-    I_SetPalette(W_CacheLumpName("PLAYPAL", PU_CACHE));
-
-    // Blank out the full screen area in case there is any junk in
-    // the borders that won't otherwise be overwritten.
-
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-    SDL_RenderPresent(renderer);
-
-    I_Printf(VB_DEBUG, "SDL %d.%d.%d (%s) render driver: %s (%s)",
-             SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION,
-             SDL_GetPlatform(),
-             SDL_GetRendererName(renderer),
-             SDL_GetCurrentVideoDriver());
 
     UpdateLimiter();
 }
@@ -1572,21 +1625,30 @@ static void CreateVideoBuffer(void)
         SDL_DestroyTexture(texture);
     }
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8,
+    VK_DestroyFramebuffers();
+
+    if (gpu_driven)
+    {
+        VK_CreateFramebuffers(video.width, video.height);
+    }
+    else
+    {
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8,
                                 SDL_TEXTUREACCESS_STREAMING,
                                 video.width, video.height);
-    if (!texture)
-    {
-        I_Error("Failed to create texture: %s", SDL_GetError());
-    }
+        if (!texture)
+        {
+            I_Error("Failed to create texture: %s", SDL_GetError());
+        }
 
-    if (!SDL_SetTexturePalette(texture, palette))
-    {
-        I_Error("Failed to set palette: %s", SDL_GetError());
-    }
+        if (!SDL_SetTexturePalette(texture, palette))
+        {
+            I_Error("Failed to set palette: %s", SDL_GetError());
+        }
 
-    SDL_SetTextureScaleMode(texture,
-        smooth_scaling ? SDL_SCALEMODE_PIXELART : SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureScaleMode(texture,
+            smooth_scaling ? SDL_SCALEMODE_PIXELART : SDL_SCALEMODE_NEAREST);
+    }
 
     if (I_VideoBuffer)
     {
@@ -1661,8 +1723,12 @@ void I_ResetScreen(void)
     CreateVideoBuffer();
     ResetLogicalSize();
 
-    SDL_SetTextureScaleMode(texture, smooth_scaling ? SDL_SCALEMODE_PIXELART
+    // TODO: Vulkan - set scale mode
+    if (!gpu_driven)
+    {
+        SDL_SetTextureScaleMode(texture, smooth_scaling ? SDL_SCALEMODE_PIXELART
                                                     : SDL_SCALEMODE_NEAREST);
+    }
 }
 
 void I_ShutdownGraphics(void)
@@ -1681,6 +1747,7 @@ void I_ShutdownGraphics(void)
     if (!D_AllowEndDoom())
     {
         // ENDOOM will be skipped, so destroy the renderer and window now.
+        // TODO: Vulkan - cleanup
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(screen);
     }
