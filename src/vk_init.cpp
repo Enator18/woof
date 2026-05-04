@@ -11,19 +11,8 @@ extern "C"
     #include "vk_buffer.h"
     #include "vk_image.h"
     #include "vk_main.h"
+    #include "vk_pipeline.h"
 }
-
-#define VK_CHECK(x)                                                   \
-    do                                                                \
-    {                                                                 \
-        VkResult err = (x);                                           \
-        if (err)                                                      \
-        {                                                             \
-            printf("Detected Vulkan error: %i at line %i in file %s", \
-                err, __LINE__, __FILE__);                             \
-            abort();                                                  \
-        }                                                             \
-    } while (0)
 
 VkBool32 DebugMessenger(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -111,7 +100,7 @@ void VK_Init(byte* paletteData)
     VK_CHECK(vmaCreateAllocator(&allocInfo, &allocator));
 
     paletteBuffer = VK_CreateBuffer(4 * 256 * 14,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
 
     byte colors[4 * 256 * 14];
 
@@ -139,20 +128,25 @@ void VK_Init(byte* paletteData)
 
     VkFenceCreateInfo fenceInfo = {};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = 0;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     fenceInfo.pNext = nullptr;
 
     for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
-        VK_CHECK(vkAllocateCommandBuffers(device, &cmdInfo, &frameData[i].cmd));
+        VK_CHECK(vkAllocateCommandBuffers(device, &cmdInfo, &frames[i].cmd));
         VK_CHECK(vkCreateSemaphore(device, &semaphoreInfo, nullptr,
-            &frameData[i].acquireSemaphore));
-        VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &frameData[i].fence));
+            &frames[i].acquireSemaphore));
+        VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &frames[i].fence));
     }
+
+    VK_InitPipelines();
 }
 
 void VK_InitSwapchain(uint32_t width, uint32_t height, boolean vsync)
 {
+    vkVsync = vsync;
+    swapWidth = width;
+    swapHeight = height;
     vkb::SwapchainBuilder swapBuilder{physDevice, device, surface};
 
     VkPresentModeKHR presentMode = vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
@@ -168,15 +162,15 @@ void VK_InitSwapchain(uint32_t width, uint32_t height, boolean vsync)
     const std::vector<VkImageView>& swapImageViews = vkbSwapchain.get_image_views().value();
 
     swapchain = vkbSwapchain.swapchain;
-    imageCount = vkbSwapchain.image_count;
-    swapImages = (vk_swapimage_t*)malloc(imageCount * sizeof(vk_swapimage_t));
+    swapImageCount = vkbSwapchain.image_count;
+    swapImages = (vk_swapimage_t*)malloc(swapImageCount * sizeof(vk_swapimage_t));
 
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphoreInfo.flags = 0;
     semaphoreInfo.pNext = nullptr;
 
-    for (uint32_t i = 0; i < imageCount; i++)
+    for (uint32_t i = 0; i < swapImageCount; i++)
     {
         swapImages[i].image = swapImageHandles[i];
         swapImages[i].view = swapImageViews[i];
@@ -187,34 +181,11 @@ void VK_InitSwapchain(uint32_t width, uint32_t height, boolean vsync)
 
 void VK_DestroySwapchain()
 {
-    for (uint32_t i = 0; i < imageCount; i++)
+    for (uint32_t i = 0; i < swapImageCount; i++)
     {
         vkDestroySemaphore(device, swapImages[i].renderSemaphore, nullptr);
         vkDestroyImageView(device, swapImages[i].view, nullptr);
-        vkDestroyImage(device, swapImages[i].image, nullptr);
     }
     free(swapImages);
     vkDestroySwapchainKHR(device, swapchain, nullptr);
-}
-
-void VK_CreateFramebuffers(uint32_t width, uint32_t height)
-{
-    frameIndexed = VK_CreateImage(width, height, VK_FORMAT_R8_UINT, 0,
-        VK_IMAGE_USAGE_STORAGE_BIT);
-    frameColor = VK_CreateImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
-        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    frameColorIntView = VK_CreateImageView(frameColor.image, VK_FORMAT_R32_UINT);
-}
-
-void VK_DestroyFramebuffers()
-{
-    if (device != VK_NULL_HANDLE)
-    {
-        vkDestroyImageView(device, frameColorIntView, nullptr);
-        VK_DestroyImage(frameColor);
-        VK_DestroyImage(frameIndexed);
-        frameColor = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
-        frameIndexed = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
-    }
 }

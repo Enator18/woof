@@ -191,6 +191,7 @@ set(WOOF_SOURCES
     vk_image.c             vk_image.h
     vk_init.cpp            vk_init.h
     vk_main.c              vk_main.h
+    vk_pipeline.c          vk_pipeline.h
     vk_vma_impl.cpp
     w_wad.c                w_wad.h
                            w_internal.h
@@ -243,6 +244,7 @@ target_link_libraries(
             volk
             opl
             textscreen
+            woof-shaders
 )
 
 target_include_directories(woof PRIVATE "${MINIMP3_INCLUDE_DIRS}/minimp3")

@@ -59,6 +59,7 @@
 #include "s_musinfo.h" // [crispy] S_ParseMusInfo()
 #include "s_sound.h"
 #include "tables.h"
+#include "vk_main.h"
 #include "w_wad.h"
 #include "z_zone.h"
 

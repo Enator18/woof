@@ -35,6 +35,7 @@
 #include "r_tranmap.h"
 #include "v_patch.h"
 #include "v_video.h"
+#include "vk_main.h"
 #include "z_zone.h"
 
 //
@@ -171,6 +172,16 @@ void R_DrawColumn(void)
             *dest = colormap[brightmap[src]][src];
         }
     }
+}
+
+void R_DrawGPUColumn(void)
+{
+    int count = dc_yh - dc_yl + 1;
+    if (count <= 0)
+    {
+        return;
+    }
+    VK_AddColumn(dc_x, dc_yl, count);
 }
 
 // Here is the version of R_DrawColumn that deals with translucent  // phares

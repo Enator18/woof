@@ -40,6 +40,7 @@ extern const byte *dc_brightmap;
 // Hook in assembler or system specific BLT here.
 
 void R_DrawColumn(void);
+void R_DrawGPUColumn(void);
 void R_DrawTLColumn(void);      // drawing translucent textures // phares
 extern void (*R_DrawFuzzColumn)(void);    // The Spectre/Invisibility effect.
 

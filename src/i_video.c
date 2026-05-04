@@ -457,6 +457,7 @@ static void I_ToggleFullScreen(void)
     }
 
     SDL_SyncWindow(screen);
+    VK_RecreateSwapchain();
 }
 
 static void UpdateLimiter(void)
@@ -908,7 +909,7 @@ void I_FinishUpdate(void)
 
     if (gpu_driven)
     {
-        // TODO: Vulkan - present frame
+        VK_DrawFrame();
     }
     else
     {

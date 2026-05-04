@@ -6,19 +6,7 @@
 #include "vk_buffer.h"
 #include "vk_main.h"
 
-#define VK_CHECK(x)                                                   \
-    do                                                                \
-    {                                                                 \
-        VkResult err = (x);                                           \
-        if (err)                                                      \
-        {                                                             \
-            printf("Detected Vulkan error: %i at line %i in file %s", \
-                err, __LINE__, __FILE__);                             \
-            abort();                                                  \
-        }                                                             \
-    } while (0)
-
-vk_buffer_t VK_CreateBuffer(size_t size, VkBufferUsageFlags usage)
+vk_buffer_t VK_CreateBuffer(size_t size, VkBufferUsageFlags usage, boolean mapped)
 {
     vk_buffer_t result;
     VkBufferCreateInfo bufferInfo =
@@ -29,19 +17,18 @@ vk_buffer_t VK_CreateBuffer(size_t size, VkBufferUsageFlags usage)
         .usage = usage
     };
 
-    VmaAllocationCreateFlags allocFlags;
-    VkMemoryPropertyFlagBits requiredFlags;
+    VmaAllocationCreateFlags allocFlags = 0;
+    VkMemoryPropertyFlagBits requiredFlags = 0;
 
-    if (usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+    if (mapped)
     {
         allocFlags = VMA_ALLOCATION_CREATE_MAPPED_BIT
             | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
     }
-    else
+    if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
     {
-        allocFlags = 0;
-        requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
 
     VmaAllocationCreateInfo allocInfo =
@@ -126,7 +113,7 @@ void EndImmediateCommands(VkCommandBuffer commandBuffer)
 
 void VK_CopyToBuffer(vk_buffer_t buffer, void* src, size_t size)
 {
-    vk_buffer_t stagingBuffer = VK_CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    vk_buffer_t stagingBuffer = VK_CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, true);
 
     void* stagingData = stagingBuffer.info.pMappedData;
     memcpy(stagingData, src, size);

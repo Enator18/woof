@@ -5,18 +5,6 @@
 #include "vk_image.h"
 #include "vk_main.h"
 
-#define VK_CHECK(x)                                                   \
-    do                                                                \
-    {                                                                 \
-        VkResult err = (x);                                           \
-        if (err)                                                      \
-        {                                                             \
-            printf("Detected Vulkan error: %i at line %i in file %s", \
-                err, __LINE__, __FILE__);                             \
-            abort();                                                  \
-        }                                                             \
-    } while (0)
-
 vk_image_t VK_CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageCreateFlags flags, VkImageUsageFlags usage)
 {
     vk_image_t result;
@@ -74,4 +62,34 @@ void VK_DestroyImage(vk_image_t image)
 {
     vkDestroyImageView(device, image.view, NULL);
     vmaDestroyImage(allocator, image.image, image.allocation);
+}
+
+VkImageMemoryBarrier2 VK_ImageBarrier(VkImage image, VkImageLayout currentLayout,
+    VkImageLayout newLayout, VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage)
+{
+    VkImageMemoryBarrier2 imageBarrier =
+    {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = srcStage,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask = dstStage,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .oldLayout = currentLayout,
+        .newLayout = newLayout,
+    };
+
+    VkImageAspectFlags aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL || currentLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+            ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageSubresourceRange subImage =
+    {
+        .aspectMask = aspectMask,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS
+    };
+
+    imageBarrier.subresourceRange = subImage;
+    imageBarrier.image = image;
+
+    return imageBarrier;
 }

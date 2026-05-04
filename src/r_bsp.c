@@ -29,6 +29,7 @@
 #include "m_fixed.h"
 #include "p_mobj.h"
 #include "r_defs.h"
+#include "r_draw.h"
 #include "r_main.h"
 #include "r_plane.h"
 #include "r_segs.h"
@@ -733,6 +734,7 @@ static void R_Subsector(int num)
 
 void R_RenderBSPNode(int bspnum)
 {
+  colfunc = R_DrawGPUColumn;
   while (!(bspnum & NF_SUBSECTOR))  // Found a subsector?
     {
       node_t *bsp = &nodes[bspnum];
