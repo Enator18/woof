@@ -50,6 +50,10 @@ void VK_Init(byte* paletteData)
 
     SDL_Vulkan_CreateSurface((SDL_Window*)I_GetSDLWindow(), instance, nullptr, &surface);
 
+    VkPhysicalDeviceFeatures feat10{};
+    feat10.shaderInt16 = true;
+    feat10.shaderInt64 = true;
+
     VkPhysicalDeviceVulkan12Features feat12{};
     feat12.bufferDeviceAddress = true;
     feat12.descriptorIndexing = true;
@@ -58,11 +62,13 @@ void VK_Init(byte* paletteData)
 
     VkPhysicalDeviceVulkan13Features feat13{};
     feat13.synchronization2 = true;
+    feat13.maintenance4 = true;
 
     vkb::PhysicalDeviceSelector selector{vkbInstance};
     vkb::PhysicalDevice vkbPhysDevice = selector
                                             .set_surface(surface)
                                             .set_minimum_version(1, 3)
+                                            .set_required_features(feat10)
                                             .set_required_features_12(feat12)
                                             .set_required_features_13(feat13)
                                             .prefer_gpu_device_type()

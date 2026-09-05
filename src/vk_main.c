@@ -30,12 +30,11 @@ vk_image_t frameIndexed;
 vk_image_t frameColor;
 VkImageView frameColorIntView;
 vk_buffer_t paletteBuffer;
-
-typedef struct vk_drawcol_s
-{
-    uint32_t pos;
-    uint32_t props;
-} vk_drawcol_t;
+vk_buffer_t columnBuffer;
+vk_buffer_t nodeBuffer;
+vk_buffer_t subsectorBuffer;
+vk_buffer_t sectorBuffer;
+vk_buffer_t segBuffer;
 
 vk_drawcol_t* columnUpload;
 uint32_t columnCount;
@@ -46,6 +45,7 @@ VkDescriptorSet transferDescSet;
 VkPipelineLayout transferLayout;
 VkPipeline transferPipeline;
 VkPipeline drawPipeline;
+VkPipeline bspPipeline;
 uint32_t frameNum;
 
 void VK_CreateFramebuffers(uint32_t width, uint32_t height)
@@ -86,11 +86,8 @@ void VK_CreateFramebuffers(uint32_t width, uint32_t height)
     vkUpdateDescriptorSets(device, 1, &descWrite, 0, NULL);
 
     size_t colBufferSize = frameWidth * frameHeight * 8;
-    for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-    {
-        frames[i].columnBuffer = VK_CreateBuffer(colBufferSize,
-            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true);
-    }
+    columnBuffer = VK_CreateBuffer(colBufferSize,
+            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
 
     columnUpload = malloc(colBufferSize);
 }
@@ -104,12 +101,91 @@ void VK_DestroyFramebuffers(void)
         VK_DestroyImage(frameColor);
         VK_DestroyImage(frameIndexed);
         frameColor.image = VK_NULL_HANDLE;
-        for (uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
-        {
-            VK_DestroyBuffer(frames[i].columnBuffer);
-        }
+        VK_DestroyBuffer(columnBuffer);
         free(columnUpload);
     }
+}
+
+int GetMaxDepth(int node)
+{
+    if (node & NF_SUBSECTOR)
+    {
+        return 0;
+    }
+    int depthA = GetMaxDepth(nodes[node].children[0]);
+    int depthB = GetMaxDepth(nodes[node].children[1]);
+    return 1 + max(depthA, depthB);
+}
+
+void VK_LoadMap(void)
+{
+    // Nodes
+    nodeBuffer = VK_CreateBuffer(numnodes * sizeof(node_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
+    VK_CopyToBuffer(nodeBuffer, nodes, numnodes * sizeof(node_t));
+
+    // Subsectors and segs
+    vk_subsector_t* vkSubsectors = malloc(numsubsectors * sizeof(vk_subsector_t));
+    vk_seg_t* vkSegs = malloc(numsegs * sizeof(vk_seg_t));
+    uint32_t realNumSegs = 0;
+    for (uint32_t i = 0; i < numsubsectors; i++)
+    {
+        subsector_t* subsector = subsectors + i;
+        vk_subsector_t vkSubsector =
+        {
+            .sector = subsector->sector - sectors,
+            .firstline = realNumSegs
+        };
+        uint32_t numlines = 0;
+        for (uint32_t line = 0; line < subsector->numlines; line++)
+        {
+            seg_t* seg = segs + subsector->firstline + line;
+            if (seg->linedef)
+            {
+                vk_seg_t vkSeg =
+                {
+                    .x1 = seg->v1->r_x,
+                    .y1 = seg->v1->r_y,
+                    .x2 = seg->v2->r_x,
+                    .y2 = seg->v2->r_y,
+                    .length = seg->r_length,
+                    .angle = seg->r_angle,
+                    .side = seg->sidedef - sides,
+                    .back = seg->backsector ? (seg->backsector - sectors) : -1
+                };
+                vkSegs[realNumSegs] = vkSeg;
+                realNumSegs++;
+                numlines++;
+            }
+        }
+        vkSubsector.numlines = numlines;
+        vkSubsectors[i] = vkSubsector;
+    }
+    subsectorBuffer = VK_CreateBuffer(numsubsectors * sizeof(vk_subsector_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
+    VK_CopyToBuffer(subsectorBuffer, vkSubsectors, numsubsectors * sizeof(vk_subsector_t));
+    free(vkSubsectors);
+
+    segBuffer = VK_CreateBuffer(realNumSegs * sizeof(vk_seg_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
+    VK_CopyToBuffer(segBuffer, vkSegs, realNumSegs * sizeof(vk_seg_t));
+    free(vkSegs);
+
+    // Sectors
+    vk_sector_t* vkSectors = malloc(numsectors * sizeof(vk_sector_t));
+    for (uint32_t i = 0; i < numsectors; i++)
+    {
+        vk_sector_t vkSector =
+        {
+            .floorheight = sectors[i].floorheight,
+            .ceilingheight = sectors[i].ceilingheight
+        };
+        vkSectors[i] = vkSector;
+    }
+    sectorBuffer = VK_CreateBuffer(numsectors * sizeof(vk_sector_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false);
+    VK_CopyToBuffer(sectorBuffer, vkSectors, numsectors * sizeof(vk_sector_t));
+    free(vkSectors);
 }
 
 void VK_RecreateSwapchain(void)
@@ -137,19 +213,6 @@ void VK_RecreateSwapchain(void)
     VK_InitSwapchain(width, height, vkVsync);
 }
 
-void VK_AddColumn(uint16_t x, uint16_t y, uint16_t height)
-{
-    uint32_t pos = x + ((uint32_t)y << 16);
-    uint32_t props = height + (112 << 16);
-    vk_drawcol_t col =
-    {
-        .pos = pos,
-        .props = props
-    };
-    columnUpload[columnCount] = col;
-    columnCount++;
-}
-
 void VK_DrawFrame(void)
 {
     VK_RecreateSwapchain();
@@ -170,9 +233,6 @@ void VK_DrawFrame(void)
     {
         resize = true;
     }
-
-    void* colBufferMapped = frames[frameNum].columnBuffer.info.pMappedData;
-    memcpy(colBufferMapped, columnUpload, sizeof(vk_drawcol_t) * columnCount);
 
     vk_swapimage_t* swapImage = &swapImages[swapIndex];
 
@@ -214,14 +274,8 @@ void VK_DrawFrame(void)
     vkCmdClearColorImage(cmd, frameIndexed.image,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &clearRange);
 
-    vk_pushconst_t pushConst =
-    {
-        .buffer = frames[frameNum].columnBuffer.address,
-        .count = columnCount
-    };
-
     vkCmdPushConstants(cmd, transferLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-        sizeof(vk_pushconst_t), &pushConst);
+        sizeof(VkDeviceAddress), &columnBuffer.address);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
         transferLayout, 0, 1, &transferDescSet, 0, NULL);
 

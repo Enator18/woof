@@ -5,6 +5,8 @@
 #include "vk_mem_alloc.h"
 
 #include "doomtype.h"
+#include "m_fixed.h"
+#include "tables.h"
 #include "vk_buffer.h"
 
 #define VK_CHECK(x)                                                   \
@@ -36,14 +38,38 @@ typedef struct vk_framedata_s
     VkCommandBuffer cmd;
     VkSemaphore acquireSemaphore;
     VkFence fence;
-    vk_buffer_t columnBuffer;
 } vk_framedata_t;
 
-typedef struct vk_pushconst_s
+typedef struct vk_subsector_s
 {
-    VkDeviceAddress buffer;
-    uint32_t count;
-} vk_pushconst_t;
+    uint32_t sector;
+    uint32_t numlines;
+    uint32_t firstline;
+
+    uint32_t padding;
+} vk_subsector_t;
+
+typedef struct vk_sector_s
+{
+    fixed_t floorheight;
+    fixed_t ceilingheight;
+} vk_sector_t;
+
+typedef struct vk_seg_s
+{
+    fixed_t x1, y1;
+    fixed_t x2, y2;
+    uint32_t length;
+    angle_t angle;
+    uint32_t side;
+    int32_t back;
+} vk_seg_t;
+
+typedef struct vk_drawcol_s
+{
+    uint32_t pos;
+    uint32_t props;
+} vk_drawcol_t;
 
 extern VkInstance instance;
 extern VkSurfaceKHR surface;
@@ -70,11 +96,12 @@ extern VkDescriptorSet transferDescSet;
 extern VkPipelineLayout transferLayout;
 extern VkPipeline transferPipeline;
 extern VkPipeline drawPipeline;
+extern VkPipeline bspPipeline;
 
 void VK_CreateFramebuffers(uint32_t width, uint32_t height);
 void VK_DestroyFramebuffers(void);
+void VK_LoadMap(void);
 void VK_RecreateSwapchain(void);
-void VK_AddColumn(uint16_t x, uint16_t y, uint16_t height);
 void VK_DrawFrame(void);
 
 #endif //VK_MAIN_H

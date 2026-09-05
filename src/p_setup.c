@@ -1157,6 +1157,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
   // [crispy] fix long wall wobble
   P_SegLengths();
 
+  VK_LoadMap();
+
   // Note: you don't need to clear player queue slots --
   // a much simpler fix is in g_game.c -- killough 10/98
 

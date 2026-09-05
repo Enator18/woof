@@ -7,6 +7,7 @@
 
 #include "shader_transfer.h"
 #include "shader_draw.h"
+#include "shader_bsp.h"
 
 VkPipeline CreateComputePipeline(VkPipelineLayout layout,
     const uint32_t* shaderData, size_t shaderSize)
@@ -90,10 +91,10 @@ void VK_InitPipelines()
 
     VK_CHECK(vkAllocateDescriptorSets(device, &descAllocInfo, &transferDescSet));
 
-    VkPushConstantRange transferConsts =
+    VkPushConstantRange constRange =
     {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .size = sizeof(vk_pushconst_t)
+        .size = 5 * sizeof(VkDeviceAddress) + 3 * sizeof(uint32_t)
     };
 
     VkPipelineLayoutCreateInfo transferLayoutInfo =
@@ -102,11 +103,12 @@ void VK_InitPipelines()
         .setLayoutCount = 1,
         .pSetLayouts = &transferDescLayout,
         .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &transferConsts
+        .pPushConstantRanges = &constRange
     };
 
     VK_CHECK(vkCreatePipelineLayout(device, &transferLayoutInfo, NULL, &transferLayout));
 
     transferPipeline = CreateComputePipeline(transferLayout, shader_transfer, sizeof(shader_transfer));
     drawPipeline = CreateComputePipeline(transferLayout, shader_draw, sizeof(shader_draw));
+    bspPipeline = CreateComputePipeline(transferLayout, shader_bsp, sizeof(shader_bsp));
 }

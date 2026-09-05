@@ -174,16 +174,6 @@ void R_DrawColumn(void)
     }
 }
 
-void R_DrawGPUColumn(void)
-{
-    int count = dc_yh - dc_yl + 1;
-    if (count <= 0)
-    {
-        return;
-    }
-    VK_AddColumn(dc_x, dc_yl, count);
-}
-
 // Here is the version of R_DrawColumn that deals with translucent  // phares
 // textures and sprites. It's identical to R_DrawColumn except      //    |
 // for the spot where the color index is stuffed into *dest. At     //    V

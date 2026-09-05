@@ -734,7 +734,6 @@ static void R_Subsector(int num)
 
 void R_RenderBSPNode(int bspnum)
 {
-  colfunc = R_DrawGPUColumn;
   while (!(bspnum & NF_SUBSECTOR))  // Found a subsector?
     {
       node_t *bsp = &nodes[bspnum];

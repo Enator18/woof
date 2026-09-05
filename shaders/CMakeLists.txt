@@ -15,6 +15,7 @@ endmacro()
 
 add_shader("transfer.comp" "transfer")
 add_shader("draw.comp" "draw")
+add_shader("bsp.comp" "bsp")
 
 add_custom_target(woof-build-shaders DEPENDS ${SHADER_OUT_NAMES})
 add_library(woof-shaders INTERFACE)

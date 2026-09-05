@@ -1,22 +1,24 @@
 #version 460
 
 #extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
 struct DrawColumn
 {
-    uint pos;
-    uint props;
+    u16vec2 pos;
+    uint16_t height;
+    uint16_t color;
 };
 
 layout (buffer_reference, std430) readonly buffer ColBuffer
 {
-    DrawColumn cols[];
+    uint count;
+    DrawColumn vals[];
 };
 
 layout (push_constant, std430) uniform PushConstants
 {
-    ColBuffer columnBuffer;
-    uint columnCount;
+    ColBuffer colBuffer;
 } pcs;
 
 layout(set = 0, binding = 0, r8ui) uniform uimage2D frameIndexed;
@@ -26,16 +28,12 @@ void main()
 {
     uint index = gl_GlobalInvocationID.x;
 
-    if (index < pcs.columnCount)
+    if (index < pcs.colBuffer.count)
     {
-        DrawColumn column = pcs.columnBuffer.cols[index];
-        uint x = column.pos & 0x0000FFFFu;
-        uint y = column.pos >> 16;
-        uint height = column.props & 0x0000FFFFu;
-        uint color = column.props >> 16;
-        for (uint i = 0; i < height; i++)
+        DrawColumn column = pcs.colBuffer.vals[index];
+        for (uint i = 0; i < column.height; i++)
         {
-            imageStore(frameIndexed, ivec2(x, y + i), uvec4(color, 0, 0, 0));
+            imageStore(frameIndexed, ivec2(column.pos.x, column.pos.y + i), uvec4(column.color, 0, 0, 0));
         }
     }
 }
