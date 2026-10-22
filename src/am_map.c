@@ -339,7 +339,7 @@ void (*AM_drawFline)(am_viewstate_t*, fline_t*, int) = AM_drawFline_Vanilla;
 // [crispy/Woof!] automap rotate mode and square aspect ratio need these early on
 static boolean automaprotate = false;
 static boolean automapsquareaspect = false;
-#define ADJUST_ASPECT_RATIO (correct_aspect_ratio && automapsquareaspect)
+#define ADJUST_ASPECT_RATIO ((correct_aspect_ratio == STRETCH_FRAMEBUFFER) && automapsquareaspect)
 static void AM_rotate(int64_t *x, int64_t *y, angle_t a);
 static void AM_transformPoint(am_viewstate_t *am, mpoint_t *pt);
 static void AM_changeWindowLoc(am_viewstate_t *am);

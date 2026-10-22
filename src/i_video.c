@@ -88,7 +88,7 @@ boolean setrefreshneeded;
 boolean toggle_fullscreen;
 
 static boolean use_vsync; // killough 2/8/98: controls whether vsync is called
-boolean correct_aspect_ratio;
+aspect_ratio_correction_mode_t correct_aspect_ratio;
 static int fpslimit; // when uncapped, limit framerate to this value
 static boolean fullscreen;
 static boolean vga_porch_flash; // emulate VGA "porch" behaviour
@@ -399,7 +399,7 @@ static boolean ToggleFullScreenKeyShortcut(SDL_Scancode scancode)
 
 static void AdjustWindowSize(void)
 {
-    if (!correct_aspect_ratio)
+    if (correct_aspect_ratio != STRETCH_FRAMEBUFFER)
     {
         return;
     }
@@ -1201,7 +1201,7 @@ static void ResetResolution(int height)
 {
     const aspect_ratio_t aspect_ratio = CurrentAspectRatio();
 
-    actualheight = correct_aspect_ratio ? (6 * height / 5) : height;
+    actualheight = (correct_aspect_ratio == STRETCH_FRAMEBUFFER) ? (6 * height / 5) : height;
     video.height = height;
 
     video.unscaledw = unscaled_actualheight * aspect_ratio.w / aspect_ratio.h;
@@ -1335,7 +1335,7 @@ static void InitVideoParms(void)
 
     if (max_video_width && max_video_height)
     {
-        if (correct_aspect_ratio && max_video_height < ACTUALHEIGHT)
+        if ((correct_aspect_ratio == STRETCH_FRAMEBUFFER) && max_video_height < ACTUALHEIGHT)
         {
             I_Error("The vertical resolution is too low, turn off the aspect "
                     "ratio correction.");
@@ -1355,7 +1355,7 @@ static void InitVideoParms(void)
         max_height = mode->h;
     }
 
-    if (correct_aspect_ratio)
+    if (correct_aspect_ratio == STRETCH_FRAMEBUFFER)
     {
         max_height_adjusted = 5 * max_height / 6;
         unscaled_actualheight = ACTUALHEIGHT;
@@ -1577,7 +1577,7 @@ static void CreateVideoBuffer(void)
 
     int n = (scalefactor == 1 ? 1 : 2);
     SDL_SetWindowMinimumSize(screen, video.unscaledw * n,
-        correct_aspect_ratio ? ACTUALHEIGHT * n : SCREENHEIGHT * n);
+        (correct_aspect_ratio == STRETCH_FRAMEBUFFER) ? ACTUALHEIGHT * n : SCREENHEIGHT * n);
 
     if (!fullscreen)
     {
@@ -1698,7 +1698,8 @@ void I_BindVideoVariables(void)
               &current_video_height, 600, 200, UL, ss_none, wad_no,
               "Vertical resolution");
     BIND_BOOL_GENERAL(dynamic_resolution, true, "Dynamic resolution");
-    BIND_BOOL(correct_aspect_ratio, true, "Aspect ratio correction");
+    M_BindNum("correct_aspect_ratio", &correct_aspect_ratio, NULL,
+        STRETCH_FRAMEBUFFER, 0, NUM_ASPECT_MODES - 1, ss_none, wad_no, "Aspect ratio correction");
     BIND_BOOL(fullscreen, true, "Fullscreen");
     BIND_BOOL_GENERAL(use_vsync, true,
         "Vertical sync to prevent display tearing");

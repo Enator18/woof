@@ -385,6 +385,7 @@ enum
     str_endoom,
     str_death_use_action,
     str_widescreen,
+    str_aspect_ratio_correction,
     str_bobbing_pct,
     str_screen_wipe,
     str_palette_changes,
@@ -2428,6 +2429,9 @@ static void ResetVideoHeight(void)
 const char *widescreen_strings[] = {"Off", "Auto", "16:10", "16:9",
                                     "21:9", "32:9"};
 
+const char *aspect_ratio_correction_strings[] = {"No Correction",
+    "Stretch Framebuffer", "Adjust Rendering"};
+
 static void ResetVideo(void)
 {
     resetneeded = true;
@@ -2470,6 +2474,9 @@ static setup_menu_t gen_settings1[] = {
 
     {"Widescreen", S_CHOICE, CNTR_X, M_SPC, {"widescreen"},
      .strings_id = str_widescreen, .action = ResetVideo},
+
+    {"Aspect Ratio Correction", S_CHOICE, CNTR_X, M_SPC, {"correct_aspect_ratio"},
+    .strings_id = str_aspect_ratio_correction, .action = ResetVideoHeight},
 
     {"Fullscreen", S_ONOFF, CNTR_X, M_SPC, {"fullscreen"},
      .action = ToggleFullScreen},
@@ -5086,6 +5093,7 @@ static const char **selectstrings[] = {
     [str_endoom] = endoom_strings,
     [str_death_use_action] = death_use_action_strings,
     [str_widescreen] = widescreen_strings,
+    [str_aspect_ratio_correction] = aspect_ratio_correction_strings,
     [str_bobbing_pct] = bobbing_pct_strings,
     [str_screen_wipe] = screen_wipe_strings,
     [str_palette_changes] = palette_changes_strings,

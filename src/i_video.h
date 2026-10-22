@@ -67,7 +67,16 @@ extern boolean resetneeded;
 extern boolean setrefreshneeded;
 extern boolean toggle_fullscreen;
 extern boolean toggle_exclusive_fullscreen;
-extern boolean correct_aspect_ratio;
+
+typedef enum
+{
+    NO_CORRECTION,
+    STRETCH_FRAMEBUFFER,
+    ADJUST_RENDERING,
+    NUM_ASPECT_MODES
+} aspect_ratio_correction_mode_t;
+
+extern aspect_ratio_correction_mode_t correct_aspect_ratio;
 extern boolean screenvisible;
 
 boolean I_WritePNGfile(char *filename); // [FG] screenshots in PNG format
